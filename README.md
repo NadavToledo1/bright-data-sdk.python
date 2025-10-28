@@ -203,7 +203,9 @@ client.download_content(data)
 **`download_snapshot`** (for async requests)
 ```python
 # Save this function to seperate file
-client.download_snapshot("") # Insert your snapshot_id
+# Download snapshot
+snapshot_id = "your_snapshot_id_here"  # <-- Replace with your actual snapshot ID
+client.download_snapshot(snapshot_id)  # Insert your snapshot_id
 ```
 
 > [!TIP]
