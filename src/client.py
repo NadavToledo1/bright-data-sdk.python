@@ -760,7 +760,15 @@ class bdclient:
                 raise ValueError("All URLs in the list must be non-empty strings.")
         else:
             raise TypeError("The 'url' parameter must be a string or a list of strings.")
-            
+
+        # Depth validation
+    
+        if depth is not None:
+            if not isinstance(depth, int):
+                raise TypeError("The 'depth' parameter must be an integer.")
+            if depth <= 0:
+                raise ValueError("The 'depth' parameter must be a positive integer.")
+                
         return self.crawl_api.crawl(
             url=url,
             ignore_sitemap=ignore_sitemap,
