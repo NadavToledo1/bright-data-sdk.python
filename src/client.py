@@ -648,7 +648,7 @@ class bdclient:
         url: Union[str, List[str]],
         ignore_sitemap: bool = None,
         depth: int = None,
-        filter: str = None,
+        include_filter: str = None,
         exclude_filter: str = None,
         custom_output_fields: List[str] = None,
         include_errors: bool = True
@@ -663,7 +663,7 @@ class bdclient:
         - `url` (str | List[str]): Domain URL(s) to crawl (required)
         - `ignore_sitemap` (bool, optional): Ignore sitemap when crawling
         - `depth` (int, optional): Maximum depth to crawl relative to the entered URL
-        - `filter` (str, optional): Regular expression to include only certain URLs (e.g. "/product/")
+        - `include_filter` (str, optional): Regular expression to include only certain URLs (e.g. "/product/")
         - `exclude_filter` (str, optional): Regular expression to exclude certain URLs (e.g. "/ads/")
         - `custom_output_fields` (List[str], optional): Custom output schema fields to include
         - `include_errors` (bool, optional): Include errors in response (default: True)
@@ -681,7 +681,7 @@ class bdclient:
         urls = ["https://example.com/", "https://example2.com/"]
         result = client.crawl(
             url=urls,
-            filter="/product/",
+            include_filter="/product/",
             exclude_filter="/ads/",
             depth=2,
             ignore_sitemap=True
@@ -721,7 +721,7 @@ class bdclient:
             url=url,
             ignore_sitemap=ignore_sitemap,
             depth=depth,
-            filter=filter,
+            include_filter=include_filter,
             exclude_filter=exclude_filter,
             custom_output_fields=custom_output_fields,
             include_errors=include_errors
