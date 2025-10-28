@@ -859,7 +859,7 @@ class bdclient:
         optimizes content for efficient LLM processing.
 
         ** LLM Key Notice:** If `llm_key` is not provided, the method will attempt to read 
-        the OpenAI API key from the `OPENAI_API_KEY` environment variable. Ensure it is set.
+        the BRIGHTDATA API key from the `BRIGHTDATA_API_TOKEN` environment variable. Ensure it is set.
 
         ### Parameters:
         - `query` (str): Natural language query describing what to extract. If `url` parameter is provided,
@@ -971,12 +971,12 @@ class bdclient:
         # Validate LLM key
         if llm_key is None:
             import os
-            llm_key = os.getenv("OPENAI_API_KEY")
+            llm_key = os.getenv("BRIGHTDATA_API_TOKEN")
             if not llm_key:
                 raise ValidationError(
-                    "Missing OpenAI API key. Provide it via the `llm_key` parameter or set the "
-                    "`OPENAI_API_KEY` environment variable. Example:\n\n"
-                    "export OPENAI_API_KEY='your-openai-api-key'"
+                    "Missing API key. Provide it via the `llm_key` parameter or set the "
+                    "`BRIGHTDATA_API_TOKEN` environment variable. Example:\n\n"
+                    "export BRIGHTDATA_API_TOKEN='your-openai-api-key'"
                 )
             
         return self.extract_api.extract(query, url, output_scheme, llm_key)
