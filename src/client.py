@@ -746,6 +746,21 @@ class bdclient:
         - `AuthenticationError`: Invalid API token or insufficient permissions
         - `APIError`: Request failed or server error
         """
+
+        # URL validation
+        
+        if not url:
+            raise ValueError("The 'url' parameter cannot be None or empty.")
+
+        if isinstance(url, str):
+            if not url.strip():
+                raise ValueError("The 'url' string cannot be empty or whitespace.")
+        elif isinstance(url, list):
+            if not all(isinstance(u, str) and u.strip() for u in url):
+                raise ValueError("All URLs in the list must be non-empty strings.")
+        else:
+            raise TypeError("The 'url' parameter must be a string or a list of strings.")
+            
         return self.crawl_api.crawl(
             url=url,
             ignore_sitemap=ignore_sitemap,
