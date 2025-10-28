@@ -335,6 +335,20 @@ class bdclient:
         - `AuthenticationError`: Invalid API token or insufficient permissions  
         - `APIError`: Request failed or server error
         """
+        
+        # Query validation
+        if not query:
+            raise ValueError("The 'query' parameter cannot be None or empty.")
+    
+        if isinstance(query, str):
+            if not query.strip():
+                raise ValueError("The 'query' string cannot be empty or whitespace.")
+        elif isinstance(query, list):
+            if not all(isinstance(q, str) and q.strip() for q in query):
+                raise ValueError("All queries in the list must be non-empty strings.")
+        else:
+            raise TypeError("The 'query' parameter must be a string or a list of strings.")
+
         zone = zone or self.serp_zone
         max_workers = max_workers or self.DEFAULT_MAX_WORKERS
         
