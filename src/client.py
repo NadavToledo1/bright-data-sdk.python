@@ -35,7 +35,7 @@ class bdclient:
     """Main client for the Bright Data SDK"""
     
     DEFAULT_MAX_WORKERS = 10
-    DEFAULT_TIMEOUT = 65
+    DEFAULT_TIMEOUT = 30
     CONNECTION_POOL_SIZE = 20
     MAX_RETRIES = 3
     RETRY_BACKOFF_FACTOR = 1.5
