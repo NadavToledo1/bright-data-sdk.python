@@ -251,7 +251,7 @@ Discover and scrape multiple pages from websites with advanced filtering.
 - `url`: Single URL string or list of URLs to crawl (required)
 - `ignore_sitemap`: Ignore sitemap when crawling (optional)
 - `depth`: Maximum crawl depth relative to entered URL (optional)
-- `filter`: Regex to include only certain URLs (e.g. "/product/")
+- `include_filter`: Regex to include only certain URLs (e.g. "/product/")
 - `exclude_filter`: Regex to exclude certain URLs (e.g. "/ads/")
 - `custom_output_fields`: List of output fields to include (optional)
 - `include_errors`: Include errors in response (default: True)
