@@ -596,6 +596,20 @@ class bdclient:
         - `AuthenticationError`: Invalid API token or insufficient permissions
         - `APIError`: Request failed, snapshot not found, or server error
         """
+        
+        # snapshot_id validation
+    
+        if not snapshot_id or not isinstance(snapshot_id, str):
+            raise ValueError("The 'snapshot_id' parameter must be a non-empty string.")
+        
+        # format validation
+    
+        allowed_formats = {"json", "ndjson", "jsonl", "csv"}
+        if format not in allowed_formats:
+            raise ValueError(
+                f"Invalid 'format' value: '{format}'. Must be one of {sorted(allowed_formats)}."
+            )
+
         return self.download_api.download_snapshot(snapshot_id, format, compress, batch_size, part)
 
 
