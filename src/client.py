@@ -857,7 +857,10 @@ class bdclient:
         Combines web scraping with OpenAI's language models to extract targeted information
         from web pages based on natural language queries. Automatically parses URLs and
         optimizes content for efficient LLM processing.
-        
+
+        ** LLM Key Notice:** If `llm_key` is not provided, the method will attempt to read 
+        the OpenAI API key from the `OPENAI_API_KEY` environment variable. Ensure it is set.
+
         ### Parameters:
         - `query` (str): Natural language query describing what to extract. If `url` parameter is provided,
                         this becomes the pure extraction query. If `url` is not provided, this should include 
@@ -964,4 +967,16 @@ class bdclient:
         - `ValidationError`: Invalid query format, missing URL, or invalid LLM key
         - `APIError`: Web scraping failed or LLM processing error
         """
+
+        # Validate LLM key
+        if llm_key is None:
+            import os
+            llm_key = os.getenv("OPENAI_API_KEY")
+            if not llm_key:
+                raise ValidationError(
+                    "Missing OpenAI API key. Provide it via the `llm_key` parameter or set the "
+                    "`OPENAI_API_KEY` environment variable. Example:\n\n"
+                    "export OPENAI_API_KEY='your-openai-api-key'"
+                )
+            
         return self.extract_api.extract(query, url, output_scheme, llm_key)
