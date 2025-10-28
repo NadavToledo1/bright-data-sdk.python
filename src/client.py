@@ -628,7 +628,11 @@ class bdclient:
         
         Returns the WebSocket endpoint URL that can be used with Playwright or Selenium
         to connect to Bright Data's scraping browser service.
-        
+
+        ** Security Warning:** The returned URL includes your browser credentials in plain text.
+        Avoid logging, sharing, or exposing this URL in publicly accessible places. Treat it as sensitive information.
+
+
         ### Returns:
             WebSocket endpoint URL string for browser connection
             
