@@ -125,7 +125,7 @@ print(results) # will print the snapshot_id, which can be downloaded using the d
 result = client.crawl(
     url="https://example.com/",
     depth=2,
-    filter="/product/",           # Only crawl URLs containing "/product/"
+    include_filter="/product/",           # Only crawl URLs containing "/product/"
     exclude_filter="/ads/",       # Exclude URLs containing "/ads/"
     custom_output_fields=["markdown", "url", "page_title"]
 )
