@@ -617,6 +617,9 @@ class bdclient:
     
         if not snapshot_id or not isinstance(snapshot_id, str):
             raise ValueError("The 'snapshot_id' parameter must be a non-empty string.")
+
+        if not snapshot_id.startswith("s_"):
+            raise ValueError("Invalid 'snapshot_id' format. Expected an ID starting with 's_' (e.g., 's_m4x7enmven8djfqak').")
         
         # format validation
     
