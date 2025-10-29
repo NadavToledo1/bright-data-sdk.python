@@ -376,11 +376,13 @@ class bdclient:
     def search_chatGPT(
         self,
         prompt: Union[str, List[str]],
-        country: Union[str, List[str]] = "",
-        additional_prompt: Union[str, List[str]] = "",
+        country: Union[str, List[str]] = None,
+        secondary_prompt: Union[str, List[str]] = None,
         web_search: Union[bool, List[bool]] = False,
-        sync: bool = True
+        sync: bool = True,
+        timeout: int = None
     ) -> Dict[str, Any]:
+
         """
         ## Search ChatGPT responses using Bright Data's ChatGPT dataset API
         
@@ -424,48 +426,62 @@ class bdclient:
         """
         if isinstance(prompt, str):
             prompts = [prompt]
-        else:
+        elif isinstance(prompt, list) and all(isinstance(p, str) for p in prompt):
             prompts = prompt
-            
-        if not prompts or len(prompts) == 0:
-            raise ValidationError("At least one prompt is required")
+        else:
+            raise ValidationError("Invalid prompt input: must be a non-empty string or list of strings.")
+    
+        if not prompts:
+            raise ValidationError("At least one prompt is required.")
             
         for p in prompts:
             if not p or not isinstance(p, str):
                 raise ValidationError("All prompts must be non-empty strings")
         
-        def normalize_param(param, param_name):
+        def normalize_param(param, name):
+            if param is None:
+                return [None] * len(prompts)
             if isinstance(param, list):
                 if len(param) != len(prompts):
-                    raise ValidationError(f"{param_name} list must have same length as prompts list")
+                    raise ValidationError(f"{name} list must have the same length as prompts.")
                 return param
-            else:
-                return [param] * len(prompts)
+            return [param] * len(prompts)
         
         countries = normalize_param(country, "country")
-        additional_prompts = normalize_param(additional_prompt, "additional_prompt")
+        secondary_prompts = normalize_param(secondary_prompt, "secondary_prompt")
         web_searches = normalize_param(web_search, "web_search")
         
         for c in countries:
-            if not isinstance(c, str):
-                raise ValidationError("All countries must be strings")
-                
-        for ap in additional_prompts:
-            if not isinstance(ap, str):
-                raise ValidationError("All additional_prompts must be strings")
-                
-        for ws in web_searches:
-            if not isinstance(ws, bool):
-                raise ValidationError("All web_search values must be booleans")
-        
-        return self.chatgpt_api.scrape_chatgpt(
-            prompts, 
-            countries, 
-            additional_prompts, 
-            web_searches,
-            sync,
-            self.DEFAULT_TIMEOUT
-        )
+            if c and not re.match(r"^[A-Z]{2}$", c):
+                raise ValidationError(f"Invalid country code '{c}'. Must be 2 uppercase letters.")
+        for s in secondary_prompts:
+            if s is not None and not isinstance(s, str):
+                raise ValidationError("Secondary prompts must be strings.")
+        for w in web_searches:
+            if not isinstance(w, bool):
+                raise ValidationError("Web search flags must be boolean.")
+        if timeout is not None and (not isinstance(timeout, int) or timeout <= 0):
+            raise ValidationError("Timeout must be a positive integer.")
+    
+        timeout = timeout or (65 if sync else 30)
+
+        # Retry logic
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                return self.chatgpt_api.scrape_chatgpt(
+                    prompts=prompts,
+                    countries=countries,
+                    secondary_prompts=secondary_prompts,
+                    web_searches=web_searches,
+                    sync=sync,
+                    timeout=timeout
+                )
+            except APIError as e:
+                if attempt < max_retries - 1:
+                    time.sleep(2)
+                    continue
+                raise e
 
     @property
     def scrape_linkedin(self):
