@@ -1,7 +1,7 @@
 
 <img width="1300" height="200" alt="sdk-banner(1)" src="https://github.com/user-attachments/assets/c4a7857e-10dd-420b-947a-ed2ea5825cb8" />
 
-<h3 align="center">Python SDK by Bright Data, Easy-to-use scalable methods for web search & scraping</h3>
+<h3 align="center">Python SDK by Bright Data, Easy to use scalable methods for web search & scraping</h3>
 <p></p>
 
 ## Installation
@@ -10,11 +10,11 @@ To install the package, open your terminal:
 ```python
 pip install brightdata-sdk
 ```
-> If using macOS, first open a virtual environment for your project
+> If using macOS, first open a virtual environment for your project.
 
 ## Quick Start
 
-Create a [Bright Data](https://brightdata.com/cp/setting/) account and copy your API key
+Create a [Bright Data](https://brightdata.com/cp/setting/) account and copy your API key.
 
 ### Initialize the Client
 
@@ -25,7 +25,7 @@ client = bdclient(api_token="your_api_token_here") # can also be defined as BRIG
 ```
 
 ### Launch first request
-Add to your code a serp function
+Add to your code a serp function.
 ```python
 results = client.search("best selling shoes")
 
@@ -51,7 +51,7 @@ print(client.parse_content(results))
 | **Client class**         | `bdclient`         | Handles authentication, automatic zone creation and managment, and options for robust error handling
 | **Parallel processing**  | **all functions**  | All functions use Concurrent processing for multiple URLs or queries, and support multiple Output Formats
 
-### Try usig one of the functions
+### Try using one of the functions
 
 #### `Search()`
 ```python
@@ -202,14 +202,14 @@ client.download_content(data)
 ```
 **`download_snapshot`** (for async requests)
 ```python
-# Save this function to seperate file
+# Save this function to a seperate file
 # Download snapshot
 snapshot_id = "your_snapshot_id_here"  # <-- Replace with your actual snapshot ID
 client.download_snapshot(snapshot_id)  # Insert your snapshot_id
 ```
 
 > [!TIP]
-> Hover over the "search" or each function in the package, to see all its available parameters.
+> Hover over the "search" or each function in the package to see all its available parameters.
 
 ![Hover-Over1](https://github.com/user-attachments/assets/51324485-5769-48d5-8f13-0b534385142e)
 
