@@ -83,10 +83,10 @@ results = client.scrape(
 ```
 #### `search_chatGPT()`
 ```python
-result = client.search_chatGPT(
-    prompt="what day is it today?"
-    # prompt=["What are the top 3 programming languages in 2024?", "Best hotels in New York", "Explain quantum computing"],
-    # additional_prompt=["Can you explain why?", "Are you sure?", ""]  
+result = client.search.chatGPT(
+    prompt="Top startups in Tel Aviv",
+    country="IL",
+    web_search=True
 )
 
 client.download_content(result) # In case of timeout error, your snapshot_id is presented and you will downloaded it using download_snapshot()
