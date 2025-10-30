@@ -315,7 +315,7 @@ class bdclient:
         zone = zone or self.serp_zone
         max_workers = max_workers or self.DEFAULT_MAX_WORKERS
         
-       result = self.search_api.search(query, search_engine, zone or self.serp_zone, response_format, method, parse, timeout or self.DEFAULT_TIMEOUT)
+        result = self.search_api.search(query, search_engine, zone or self.serp_zone, response_format, method, parse, timeout or self.DEFAULT_TIMEOUT)
         return result
 
     def download_content(self, content: Union[Dict, str], filename: str = None, format: str = "json", parse: bool = False) -> str:
