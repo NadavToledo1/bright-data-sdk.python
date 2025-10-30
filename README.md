@@ -38,10 +38,10 @@ print(client.parse_content(results))
 
 | Feature                        | Functions                   | Description
 |--------------------------|-----------------------------|-------------------------------------
-| **Scrape every website** | `scrape`                    | Scrape every website using Bright's scraping and unti bot-detection capabilities
-| **Web search**           | `search`                    | Search google and other search engines by query (supports batch searches)
+| **Scrape any website** | `scrape`                    | Scrape every website using Bright's scraping and unti bot-detection capabilities
+| **Web search(SERP)**           | `search`                    | Search google and other search engines by query (supports batch searches)
 | **Web crawling**         | `crawl`                     | Discover and scrape multiple pages from websites with advanced filtering and depth control
-| **AI-powered extraction** | `extract`                  | Extract specific information from websites using natural language queries and OpenAI
+| **AI extraction** | `extract`                  | Extract specific information from websites using natural language queries and OpenAI
 | **Content parsing**      | `parse_content`             | Extract text, links, images and structured data from API responses (JSON or HTML)
 | **Browser automation**   | `connect_browser`           | Get WebSocket endpoint for Playwright/Selenium integration with Bright Data's scraping browser
 | **Search chatGPT**       | `search_chatGPT`            | Prompt chatGPT and scrape its answers, support multiple inputs and follow-up prompts
@@ -55,7 +55,7 @@ print(client.parse_content(results))
 
 #### `Search()`
 ```python
-# Simple single query search
+# Single query search
 result = client.search("pizza restaurants")
 
 # Try using multiple queries (parallel processing), with custom configuration
@@ -69,7 +69,7 @@ results = client.search(
 ```
 #### `scrape()`
 ```python
-# Simple single URL scrape
+# Single URL scrape
 result = client.scrape("https://example.com")
 
 # Multiple URLs (parallel processing) with custom options
@@ -83,13 +83,20 @@ results = client.scrape(
 ```
 #### `search_chatGPT()`
 ```python
-result = client.search.chatGPT(
+# Sync mode (immediate result)
+result = client.search_gpt(
     prompt="Top startups in Tel Aviv",
     country="IL",
     web_search=True
 )
+print(result)
 
-client.download_content(result) # In case of timeout error, your snapshot_id is presented and you will downloaded it using download_snapshot()
+# Async mode (retrieve snapshot later)
+result = client.search_gpt(
+    prompt="Top startups in 2024",
+    sync=False
+)
+print(result["snapshot_id"])
 ```
 
 #### `search_linkedin.`
