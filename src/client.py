@@ -315,8 +315,19 @@ class bdclient:
         zone = zone or self.serp_zone
         max_workers = max_workers or self.DEFAULT_MAX_WORKERS
         
-        result = self.search_api.search(query, search_engine, zone or self.serp_zone,
-                                response_format, method, parse, timeout or self.DEFAULT_TIMEOUT)
+        result = self.search_api.search(
+        query=query,
+        search_engine=search_engine,
+        zone=zone or self.serp_zone,
+        response_format=response_format,
+        method=method,
+        country=country,
+        data_format=data_format,
+        async_request=async_request,
+        max_workers=max_workers,
+        timeout=timeout or self.DEFAULT_TIMEOUT,
+        parse=parse,
+        )
 
         return result
 
