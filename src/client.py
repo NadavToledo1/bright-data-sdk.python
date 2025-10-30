@@ -17,7 +17,6 @@ from .utils import ZoneManager, setup_logging, get_logger, parse_content
 def _get_version():
     """Get version from __init__.py, cached at module import time."""
     try:
-        import os
         init_file = os.path.join(os.path.dirname(__file__), '__init__.py')
         with open(init_file, 'r', encoding='utf-8') as f:
             for line in f:
@@ -76,6 +75,7 @@ class bdclient:
             verbose: Enable verbose logging (default: False). Can also be set via BRIGHTDATA_VERBOSE env var.
                     When False, only shows WARNING and above. When True, shows all logs per log_level.
         """
+        
         try:
             from dotenv import load_dotenv
             load_dotenv()
@@ -209,7 +209,8 @@ class bdclient:
         """
         ## Unlock and scrape websites using Bright Data Web Unlocker API
         
-        Scrapes one or multiple URLs through Bright Data's proxy network with anti-bot detection bypass.
+        Scrapes one or multiple websites using Bright Data's Web Unlocker and proxy network.
+        Automatically handles bot-detection, CAPTCHAs, and retries.
         
         ### Parameters:
         - `url` (str | List[str]): Single URL string or list of URLs to scrape
@@ -226,50 +227,30 @@ class bdclient:
         - Single URL: `Dict[str, Any]` if `response_format="json"`, `str` if `response_format="raw"`
         - Multiple URLs: `List[Union[Dict[str, Any], str]]` corresponding to each input URL
         
-        ### Example Usage:
-        ```python
-        # Single URL scraping
-        result = client.scrape(
-            url="https://example.com", 
-            response_format="json"
-        )
-        
-        # Multiple URLs scraping
-        urls = ["https://site1.com", "https://site2.com"]
-        results = client.scrape(
-            url=urls,
-            response_format="raw",
-            max_workers=5
-        )
-        ```
-        
         ### Raises:
-        - `ValidationError`: Invalid URL format or empty URL list
-        - `AuthenticationError`: Invalid API token or insufficient permissions
-        - `APIError`: Request failed or server error
+        - `ValidationError`: Invalid URL or parameters
+        - `APIError`: Scraping failed (non-2xx response or server error)
         """
         
         # URL validation
         
         if not url:
-            raise ValueError("The 'url' parameter cannot be None or empty.")
+            raise ValidationError("The 'url' parameter cannot be None or empty.")
 
         if isinstance(url, str):
             if not url.strip():
-                raise ValueError("The 'url' string cannot be empty or whitespace.")
+                raise ValidationError("The 'url' string cannot be empty or whitespace.")
         elif isinstance(url, list):
-            if not all(isinstance(u, str) and u.strip() for u in url):
-                raise ValueError("All URLs in the list must be non-empty strings.")
-        else:
-            raise TypeError("The 'url' parameter must be a string or a list of strings.")
-            
-        zone = zone or self.web_unlocker_zone
-        max_workers = max_workers or self.DEFAULT_MAX_WORKERS
+            if len(url) == 0:
+                raise ValidationError("URL list cannot be empty")
+            if any((not isinstance(u, str) or not u.strip()) for u in url):
+                raise ValidationError("All URLs in the list must be non-empty strings")
         
-        return self.web_scraper.scrape(
-            url, zone, response_format, method, country, data_format,
-            async_request, max_workers, timeout
+        result = self.web_scraper.scrape(
+            url, zone or self.web_unlocker_zone, response_format, method, country,
+            data_format, async_request, max_workers or self.DEFAULT_MAX_WORKERS, timeout or self.DEFAULT_TIMEOUT
         )
+        return result
 
     def search(
         self,
@@ -286,10 +267,7 @@ class bdclient:
         parse: bool = False
     ) -> Union[Dict[str, Any], str, List[Union[Dict[str, Any], str]]]:
         """
-        ## Search the web using Bright Data SERP API
-        
-        Performs web searches through major search engines using Bright Data's proxy network 
-        for reliable, bot-detection-free results.
+        ## Perform web search using Bright Data's SERP
         
         ### Parameters:
         - `query` (str | List[str]): Search query string or list of search queries
@@ -308,55 +286,37 @@ class bdclient:
         - Single query: `Dict[str, Any]` if `response_format="json"`, `str` if `response_format="raw"`
         - Multiple queries: `List[Union[Dict[str, Any], str]]` corresponding to each input query
         
-        ### Example Usage:
-        ```python
-        # Single search query
-        result = client.search(
-            query="best laptops 2024",
-            search_engine="google",
-            response_format="json"
-        )
-        
-        # Multiple search queries
-        queries = ["python tutorials", "machine learning courses", "web development"]
-        results = client.search(
-            query=queries,
-            search_engine="bing",
-            max_workers=3
-        )
-        ```
-        
-        ### Supported Search Engines:
-        - `"google"` - Google Search
-        - `"bing"` - Microsoft Bing
-        - `"yandex"` - Yandex Search
-        
         ### Raises:
-        - `ValidationError`: Invalid search engine, empty query, or validation errors
-        - `AuthenticationError`: Invalid API token or insufficient permissions  
-        - `APIError`: Request failed or server error
+        - `ValidationError`: Query is missing or invalid
+        - `APIError`: Search request failed or returned an error
         """
         
         # Query validation
+        
         if not query:
-            raise ValueError("The 'query' parameter cannot be None or empty.")
-    
+            raise ValidationError("The 'query' parameter cannot be None or empty.")
         if isinstance(query, str):
             if not query.strip():
-                raise ValueError("The 'query' string cannot be empty or whitespace.")
+                raise ValidationError("Search query cannot be empty or whitespace")
         elif isinstance(query, list):
-            if not all(isinstance(q, str) and q.strip() for q in query):
-                raise ValueError("All queries in the list must be non-empty strings.")
-        else:
-            raise TypeError("The 'query' parameter must be a string or a list of strings.")
+            if len(query) == 0:
+                raise ValidationError("Query list cannot be empty")
+            for q in query:
+                if not isinstance(q, str) or not q.strip():
+                    raise ValidationError("All queries in the list must be non-empty strings")
+                    
+        # Validate search engine
+        
+        search_engine = (search_engine or "google").strip().lower()
+        valid_engines = ["google", "bing", "yandex"]
+        if search_engine not in valid_engines:
+            raise ValidationError(f"Invalid search engine '{search_engine}'. Valid options: {', '.join(valid_engines)}")
 
         zone = zone or self.serp_zone
         max_workers = max_workers or self.DEFAULT_MAX_WORKERS
         
-        return self.search_api.search(
-            query, search_engine, zone, response_format, method, country,
-            data_format, async_request, max_workers, timeout, parse
-        )
+       result = self.search_api.search(query, search_engine, zone or self.serp_zone, response_format, method, parse, timeout or self.DEFAULT_TIMEOUT)
+        return result
 
     def download_content(self, content: Union[Dict, str], filename: str = None, format: str = "json", parse: bool = False) -> str:
         """
@@ -369,19 +329,22 @@ class bdclient:
             parse: If True, automatically parse JSON strings in 'body' fields to objects (default: False)
         
         ### Returns:
-            Path to the downloaded file
+            The file path of the saved file.
         """
-        return self.download_api.download_content(content, filename, format, parse)
+        if not content:
+            raise ValidationError("Content is empty or None")
+        return self.download_api.download_content(content, filename, response_format, parse)
     
 
-    def search_chatGPT(
+    def search_gpt(
         self,
         prompt: Union[str, List[str]],
         country: Union[str, List[str]] = None,
-        secondary_prompt: Union[str, List[str]] = None,
+        additional_prompt: Union[str, List[str]] = None,
         web_search: Union[bool, List[bool]] = False,
         sync: bool = True,
-        timeout: int = None
+        timeout: int = None,
+        **kwargs
     ) -> Dict[str, Any]:
 
         """
@@ -400,43 +363,34 @@ class bdclient:
         ### Returns:
         - `Dict[str, Any]`: If sync=True, returns ChatGPT response data directly. If sync=False, returns response with snapshot_id for async processing
         
-        ### Example Usage:
-        ```python
-        # Single prompt (synchronous - returns data immediately)
-        result = client.search_chatGPT(prompt="Top hotels in New York")
-        
-        # Multiple prompts (synchronous - returns data immediately)
-        result = client.search_chatGPT(
-            prompt=["Top hotels in New York", "Best restaurants in Paris", "Tourist attractions in Tokyo"],
-            additional_prompt=["Are you sure?", "", "What about hidden gems?"]
-        )
-        
-        # Asynchronous with web search enabled (returns snapshot_id)
-        result = client.search_chatGPT(
-            prompt="Latest AI developments", 
-            web_search=True,
-            sync=False
-        )
-        # Snapshot ID is automatically printed for async requests
-        ```
-        
         ### Raises:
         - `ValidationError`: Invalid prompt or parameters
         - `AuthenticationError`: Invalid API token or insufficient permissions
         - `APIError`: Request failed or server error
         """
-        if isinstance(prompt, str):
-            prompts = [prompt]
-        elif isinstance(prompt, list) and all(isinstance(p, str) for p in prompt):
-            prompts = prompt
-        else:
-            raise ValidationError("Invalid prompt input: must be a non-empty string or list of strings.")
-    
-        if not prompts:
-            raise ValidationError("At least one prompt is required.")
+        
+       # Handle alternate parameter names from kwargs
+        
+        if 'secondaryPrompt' in kwargs:
+            additional_prompt = kwargs.pop('secondaryPrompt')
+        if 'additionalPrompt' in kwargs:
+            additional_prompt = kwargs.pop('additionalPrompt')
+        if 'webSearch' in kwargs:
+            web_search = kwargs.pop('webSearch')
             
+        # Validate prompt input
+        
+        if (isinstance(prompt, list) and len(prompt) == 0) or prompt is None:
+            raise ValidationError("prompt is required")
+            
+        # Ensure prompts list
+        
+        prompts = prompt if isinstance(prompt, list) else [prompt]
+        
+        # Validate each prompt is a non-empty string
+        
         for p in prompts:
-            if not p or not isinstance(p, str):
+            if not isinstance(p, str) or not p.strip():
                 raise ValidationError("All prompts must be non-empty strings")
         
         def normalize_param(param, name):
@@ -444,45 +398,95 @@ class bdclient:
                 return [None] * len(prompts)
             if isinstance(param, list):
                 if len(param) != len(prompts):
-                    raise ValidationError(f"{name} list must have the same length as prompts.")
+                    raise ValidationError(f"Length of {name} list must match number of prompts")
                 return param
             return [param] * len(prompts)
         
         countries = normalize_param(country, "country")
-        secondary_prompts = normalize_param(secondary_prompt, "secondary_prompt")
+        followups = normalize_param(additional_prompt, "additional_prompt")
         web_searches = normalize_param(web_search, "web_search")
         
-        for c in countries:
-            if c and not re.match(r"^[A-Z]{2}$", c):
-                raise ValidationError(f"Invalid country code '{c}'. Must be 2 uppercase letters.")
-        for s in secondary_prompts:
-            if s is not None and not isinstance(s, str):
-                raise ValidationError("Secondary prompts must be strings.")
-        for w in web_searches:
-            if not isinstance(w, bool):
-                raise ValidationError("Web search flags must be boolean.")
-        if timeout is not None and (not isinstance(timeout, int) or timeout <= 0):
-            raise ValidationError("Timeout must be a positive integer.")
+         # Validate country codes
+        for i, c in enumerate(countries):
+            if c is None or str(c).strip() == "":
+                countries[i] = ""
+            else:
+                if not isinstance(c, str) or len(c.strip()) != 2 or not c.strip().isalpha():
+                    raise ValidationError("Country code must be a 2-letter code (ISO 3166-1 alpha-2)")
+                countries[i] = c.strip().lower()
+        # Validate follow-up prompts
+        for i, f in enumerate(followups):
+            if f is None:
+                followups[i] = ""
+            elif not isinstance(f, str):
+                raise ValidationError("All follow-up prompts must be strings")
+            else:
+                followups[i] = f.strip()
+        # Validate web_search flags
+        for i, w in enumerate(web_searches):
+            if w is None:
+                web_searches[i] = False
+            elif not isinstance(w, bool):
+                raise ValidationError("must be a boolean or list of booleans")
     
-        timeout = timeout or (65 if sync else 30)
-
-        # Retry logic
-        max_retries = 3
-        for attempt in range(max_retries):
+        timeout_value = timeout if timeout is not None else (65 if sync else 30)
+        
+        if timeout is not None:
+            if not isinstance(timeout, int):
+                raise ValidationError("Timeout must be an integer")
+            if timeout <= 0:
+                raise ValidationError("Timeout must be greater than 0 seconds")
+            if timeout > 300:
+                raise ValidationError("Timeout cannot exceed 300 seconds (5 minutes)")
+        # Prepare request payload
+        tasks = []
+        for i in range(len(prompts)):
+            task = {
+                "url": "https://chatgpt.com",
+                "prompt": prompts[i].strip(),
+                "country": countries[i] or "",
+                "additional_prompt": followups[i] or "",
+                "web_search": bool(web_searches[i])
+            }
+            tasks.append(task)
+        payload_data = tasks[0] if len(tasks) == 1 else tasks
+        # Make API request with retries
+        endpoint = "https://api.brightdata.com/datasets/v3/scrape" if sync else "https://api.brightdata.com/datasets/v3/trigger"
+        params = {
+            "dataset_id": "gd_m7aof0k82r803d5bjm",
+            "include_errors": "true"
+        }
+        last_exception = None
+        for attempt in range(self.MAX_RETRIES + 1):
             try:
-                return self.chatgpt_api.scrape_chatgpt(
-                    prompts=prompts,
-                    countries=countries,
-                    secondary_prompts=secondary_prompts,
-                    web_searches=web_searches,
-                    sync=sync,
-                    timeout=timeout
-                )
-            except APIError as e:
-                if attempt < max_retries - 1:
-                    time.sleep(2)
-                    continue
-                raise e
+                response = self.session.post(endpoint, params=params, json=payload_data, timeout=timeout_value)
+            except requests.exceptions.RequestException as e:
+                last_exception = e
+                if attempt >= self.MAX_RETRIES:
+                    raise NetworkError(f"Network error: {e}")
+                # Retry on network errors
+                time.sleep(self.RETRY_BACKOFF_FACTOR ** attempt)
+                continue
+            if response.status_code == 401:
+                raise AuthenticationError("Invalid API token or unauthorized")
+            if response.status_code in self.RETRY_STATUSES:
+                if attempt >= self.MAX_RETRIES:
+                    raise RuntimeError("Failed after retries")
+                time.sleep(self.RETRY_BACKOFF_FACTOR ** attempt)
+                continue
+            if response.status_code != 200:
+                raise APIError(f"ChatGPT search failed with status {response.status_code}: {response.text}", status_code=response.status_code, response_text=getattr(response, 'text', ''))
+            # Success
+            result_data = response.json()
+            if sync:
+                return result_data
+            snapshot_id = result_data.get("snapshot_id") or result_data.get("id")
+            if snapshot_id:
+                print(f"Snapshot ID: {snapshot_id}")
+                return {"snapshot_id": snapshot_id}
+            else:
+                raise APIError("Failed to retrieve snapshot ID from response", status_code=response.status_code, response_text=response.text)
+ 
 
     @property
     def scrape_linkedin(self):
@@ -569,7 +573,7 @@ class bdclient:
     def download_snapshot(
         self,
         snapshot_id: str,
-        format: str = "json",
+        response_format: str = "json",
         compress: bool = False,
         batch_size: int = None,
         part: int = None
@@ -582,7 +586,7 @@ class bdclient:
         
         ### Parameters:
         - `snapshot_id` (str): The snapshot ID returned when collection was triggered (required)
-        - `format` (str, optional): Format of the data - "json", "ndjson", "jsonl", or "csv" (default: "json")
+        - `response_format` (str, optional): Format of the output data: "json", "csv", "ndjson", "jsonl" (default: "json")
         - `compress` (bool, optional): Whether the result should be compressed (default: False)
         - `batch_size` (int, optional): Divide into batches of X records (minimum: 1000)
         - `part` (int, optional): If batch_size provided, specify which part to download
@@ -591,36 +595,18 @@ class bdclient:
         - `Union[Dict, List, str]`: Snapshot data in the requested format, OR
         - `Dict`: Status response if snapshot is not ready yet (status="not_ready")
         
-        ### Example Usage:
-        ```python
-        # Download complete snapshot
-        result = client.download_snapshot("s_m4x7enmven8djfqak")
-        
-        # Check if snapshot is ready
-        if isinstance(result, dict) and result.get('status') == 'not_ready':
-            print(f"Not ready: {result['message']}")
-            # Try again later
-        else:
-            # Snapshot data is ready
-            data = result
-        
-        # Download as CSV format
-        csv_data = client.download_snapshot("s_m4x7enmven8djfqak", format="csv")
-        ```
-        
+       
         ### Raises:
         - `ValidationError`: Invalid parameters or snapshot_id format
-        - `AuthenticationError`: Invalid API token or insufficient permissions
         - `APIError`: Request failed, snapshot not found, or server error
         """
         
         # snapshot_id validation
     
         if not snapshot_id or not isinstance(snapshot_id, str):
-            raise ValueError("The 'snapshot_id' parameter must be a non-empty string.")
-
+            raise ValidationError("The 'snapshot_id' parameter must be a non-empty string.")
         if not snapshot_id.startswith("s_"):
-            raise ValueError("Invalid 'snapshot_id' format. Expected an ID starting with 's_' (e.g., 's_m4x7enmven8djfqak').")
+            raise ValidationError("Invalid 'snapshot_id' format. Expected an ID starting with 's_' (e.g., 's_m4x7enmven8djfqak').")
         
         # format validation
     
@@ -630,7 +616,7 @@ class bdclient:
                 f"Invalid 'format' value: '{format}'. Must be one of {sorted(allowed_formats)}."
             )
 
-        return self.download_api.download_snapshot(snapshot_id, format, compress, batch_size, part)
+        return self.download_api.download_snapshot(snapshot_id, response_format, compress, batch_size, part)
 
 
     def list_zones(self) -> List[Dict[str, Any]]:
@@ -649,38 +635,16 @@ class bdclient:
         Returns the WebSocket endpoint URL that can be used with Playwright or Selenium
         to connect to Bright Data's scraping browser service.
 
-        ** Security Warning:** The returned URL includes your browser credentials in plain text.
-        Avoid logging, sharing, or exposing this URL in publicly accessible places. Treat it as sensitive information.
-
+        **Security Warning:** The returned URL contains authentication credentials. Do not share this URL or expose it publicly.
 
         ### Returns:
-            WebSocket endpoint URL string for browser connection
-            
-        ### Example Usage:
-        ```python
-        # For Playwright (default)
-        client = bdclient(
-            api_token="your_token",
-            browser_username="username-zone-browser_zone1",
-            browser_password="your_password",
-            browser_type="playwright"  # Playwright/ Puppeteer (default)
-        )
-        endpoint_url = client.connect_browser()  # Returns: wss://...@brd.superproxy.io:9222
-        
-        # For Selenium
-        client = bdclient(
-            api_token="your_token", 
-            browser_username="username-zone-browser_zone1",
-            browser_password="your_password",
-            browser_type="selenium"
-        )
-        endpoint_url = client.connect_browser()  # Returns: https://...@brd.superproxy.io:9515
-        ```
+            WebSocket URL (str) for connecting to the browser (contains one-time token)
         
         ### Raises:
-        - `ValidationError`: Browser credentials not provided or invalid
-        - `AuthenticationError`: Invalid browser credentials
+            - `AuthenticationError`: If the API token or browser zone credentials are invalid
+            - `APIError`: If retrieving the browser endpoint fails
         """
+        
         if not self.browser_username or not self.browser_password:
             logger.error("Browser credentials not configured")
             raise ValidationError(
@@ -727,95 +691,45 @@ class bdclient:
         starting from the specified URL(s). Returns a snapshot_id for tracking the crawl progress.
         
         ### Parameters:
-        - `url` (str | List[str]): Domain URL(s) to crawl (required)
-        - `ignore_sitemap` (bool, optional): Ignore sitemap when crawling
-        - `depth` (int, optional): Maximum depth to crawl relative to the entered URL
-        - `include_filter` (str, optional): Regular expression to include only certain URLs (e.g. "/product/")
-        - `exclude_filter` (str, optional): Regular expression to exclude certain URLs (e.g. "/ads/")
-        - `custom_output_fields` (List[str], optional): Custom output schema fields to include
-        - `include_errors` (bool, optional): Include errors in response (default: True)
+            - `url` (str | List[str]): Starting URL or URLs to crawl
+            - `ignore_sitemap` (bool, optional): If True, ignore site's sitemap (default: False)
+            - `depth` (int, optional): Maximum crawl depth (number of hops from start URL)
+            - `include_filter` (str, optional): Only crawl URLs that include this substring (default: None)
+            - `exclude_filter` (str, optional): Do not crawl URLs that include this substring
+            - `custom_output_fields` (List[str], optional): Additional data fields to return (e.g., ["markdown","text","title"])
+            - `include_errors` (bool, optional): If True, include pages that errored in results (default: True)
         
         ### Returns:
-        - `Dict[str, Any]`: Crawl response with snapshot_id for tracking
-        
-        ### Example Usage:
-        ```python
-        # Single URL crawl
-        result = client.crawl("https://example.com/")
-        snapshot_id = result['snapshot_id']
-        
-        # Multiple URLs with filters
-        urls = ["https://example.com/", "https://example2.com/"]
-        result = client.crawl(
-            url=urls,
-            include_filter="/product/",
-            exclude_filter="/ads/",
-            depth=2,
-            ignore_sitemap=True
-        )
-        
-        # Custom output schema
-        result = client.crawl(
-            url="https://example.com/",
-            custom_output_fields=["markdown", "url", "page_title"]
-        )
-        
-        # Download results using snapshot_id
-        data = client.download_snapshot(result['snapshot_id'])
-        ```
-        
-        ### Available Output Fields:
-        - `markdown` - Page content in markdown format
-        - `url` - Page URL
-        - `html2text` - Page content as plain text
-        - `page_html` - Raw HTML content
-        - `ld_json` - Structured data (JSON-LD)
-        - `page_title` - Page title
-        - `timestamp` - Crawl timestamp
-        - `input` - Input parameters used
-        - `discovery_input` - Discovery parameters
-        - `error` - Error information (if any)
-        - `error_code` - Error code (if any)
-        - `warning` - Warning information (if any)
-        - `warning_code` - Warning code (if any)
+            - A dict containing the crawl job details, including a `snapshot_id` to retrieve results via download_snapshot()
         
         ### Raises:
-        - `ValidationError`: Invalid URL or parameters
-        - `AuthenticationError`: Invalid API token or insufficient permissions
-        - `APIError`: Request failed or server error
+            - `ValidationError`: Missing URL or invalid parameters
+            - `APIError`: Crawl request failed
         """
 
         # URL validation
         
         if not url:
-            raise ValueError("The 'url' parameter cannot be None or empty.")
-
+            raise ValidationError("The 'url' parameter cannot be None or empty.")
         if isinstance(url, str):
             if not url.strip():
-                raise ValueError("The 'url' string cannot be empty or whitespace.")
+                raise ValidationError("The 'url' string cannot be empty or whitespace.")
         elif isinstance(url, list):
-            if not all(isinstance(u, str) and u.strip() for u in url):
-                raise ValueError("All URLs in the list must be non-empty strings.")
-        else:
-            raise TypeError("The 'url' parameter must be a string or a list of strings.")
-
-        # Depth validation
-    
+            if len(url) == 0:
+                raise ValidationError("URL list cannot be empty")
+            for u in url:
+                if not isinstance(u, str) or not u.strip():
+                    raise ValidationError("All URLs in the list must be non-empty strings")
         if depth is not None:
             if not isinstance(depth, int):
-                raise TypeError("The 'depth' parameter must be an integer.")
+                raise ValidationError("Depth must be an integer")
             if depth <= 0:
-                raise ValueError("The 'depth' parameter must be a positive integer.")
-                
-        return self.crawl_api.crawl(
-            url=url,
-            ignore_sitemap=ignore_sitemap,
-            depth=depth,
-            include_filter=include_filter,
-            exclude_filter=exclude_filter,
-            custom_output_fields=custom_output_fields,
-            include_errors=include_errors
+                raise ValidationError("The 'depth' parameter must be a positive integer.")
+        
+        result = self.crawl_api.crawl(
+            url, ignore_sitemap, depth, include_filter, exclude_filter, custom_output_fields, include_errors
         )
+        return result
 
     def parse_content(
         self,
@@ -839,30 +753,8 @@ class bdclient:
         ### Returns:
         - `Dict[str, Any]`: Parsed content for single results
         - `List[Dict[str, Any]]`: List of parsed content for multiple results (auto-detected)
-        
-        ### Example Usage:
-        ```python
-        # Parse single URL results
-        scraped_data = client.scrape("https://example.com")
-        parsed = client.parse_content(scraped_data, extract_text=True, extract_links=True)
-        print(f"Title: {parsed['title']}")
-        
-        # Parse multiple URL results (auto-detected)
-        scraped_data = client.scrape(["https://example1.com", "https://example2.com"])
-        parsed_list = client.parse_content(scraped_data, extract_text=True)
-        for result in parsed_list:
-            print(f"Title: {result['title']}")
-        ```
-        
-        ### Available Fields in Each Result:
-        - `type`: 'json' or 'html' - indicates the source data type
-        - `text`: Cleaned text content (if extract_text=True)
-        - `links`: List of {'url': str, 'text': str} objects (if extract_links=True)
-        - `images`: List of {'url': str, 'alt': str} objects (if extract_images=True)
-        - `title`: Page title (if available)
-        - `raw_length`: Length of original content
-        - `structured_data`: Original JSON data (if type='json')
         """
+        
         return parse_content(
             data=data,
             extract_text=extract_text,
@@ -878,125 +770,29 @@ class bdclient:
         from web pages based on natural language queries. Automatically parses URLs and
         optimizes content for efficient LLM processing.
 
-        ** LLM Key Notice:** If `llm_key` is not provided, the method will attempt to read 
-        the BRIGHTDATA API key from the `BRIGHTDATA_API_TOKEN` environment variable. Ensure it is set.
+        **LLM Key Notice:** If `llm_key` is not provided, the method will attempt to read 
+        the OpenAI API key from the `OPENAI_API_KEY` environment variable. Ensure it is set.
 
         ### Parameters:
         - `query` (str): Natural language query describing what to extract. If `url` parameter is provided,
-                        this becomes the pure extraction query. If `url` is not provided, this should include 
-                        the URL (e.g. "extract the most recent news from cnn.com")
-        - `url` (str | List[str], optional): Direct URL(s) to scrape. If provided, bypasses URL extraction 
-                        from query and sends these URLs to the web unlocker API
-        - `output_scheme` (dict, optional): JSON Schema defining the expected structure for the LLM response.
-                        Uses OpenAI's Structured Outputs for reliable type-safe responses.
-                        Example: {"type": "object", "properties": {"title": {"type": "string"}, "date": {"type": "string"}}, "required": ["title", "date"]}
-        - `llm_key` (str, optional): OpenAI API key. If not provided, uses OPENAI_API_KEY env variable
-        
+                         the extraction will run on that URL. Otherwise, a prior scrape result should be provided.
+        - `url` (str | List[str], optional): Target page URL(s) to extract information from. Can be omitted if using a prior result.
+        - `output_scheme` (Dict, optional): JSON schema defining the structure of desired output (keys and value types)
+        - `llm_key` (str, optional): OpenAI API key for LLM usage (if not provided, will use environment variable)
+
         ### Returns:
-        - `str`: Extracted content (also provides access to metadata via attributes)
-        
-        ### Example Usage:
-        ```python
-        # Using URL parameter with structured output (new)
-        result = client.extract(
-            query="extract the most recent news headlines",
-            url="https://cnn.com",
-            output_scheme={
-                "type": "object",
-                "properties": {
-                    "headlines": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "title": {"type": "string"},
-                                "date": {"type": "string"}
-                            },
-                            "required": ["title", "date"]
-                        }
-                    }
-                },
-                "required": ["headlines"]
-            }
-        )
-        print(result)  # Prints the extracted news content
-        
-        # Using URL in query (original behavior)
-        result = client.extract("extract the most recent news from cnn.com")
-        
-        # Multiple URLs with structured schema
-        result = client.extract(
-            query="extract main headlines", 
-            url=["https://cnn.com", "https://bbc.com"],
-            output_scheme={
-                "type": "object",
-                "properties": {
-                    "sources": {
-                        "type": "array",
-                        "items": {
-                            "type": "object", 
-                            "properties": {
-                                "source_name": {"type": "string"},
-                                "headlines": {"type": "array", "items": {"type": "string"}}
-                            },
-                            "required": ["source_name", "headlines"]
-                        }
-                    }
-                },
-                "required": ["sources"]
-            }
-        )
-        
-        # Access metadata attributes
-        print(f"Source: {result.url}")
-        print(f"Title: {result.source_title}")
-        print(f"Tokens used: {result.token_usage['total_tokens']}")
-        
-        # Use with custom OpenAI key
-        result = client.extract(
-            query="get the price and description",
-            url="https://amazon.com/dp/B079QHML21",
-            llm_key="your-openai-api-key"
-        )
-        ```
-        
-        ### Environment Variable Setup:
-        ```bash
-        # Set in .env file
-        OPENAI_API_KEY=your-openai-api-key
-        ```
-        
-        ### Available Attributes:
-        ```python
-        result = client.extract("extract news from cnn.com")
-        
-        # String value (default behavior)
-        str(result)              # Extracted content
-        
-        # Metadata attributes
-        result.query             # 'extract news'  
-        result.url               # 'https://www.cnn.com'
-        result.source_title      # 'CNN - Breaking News...'
-        result.content_length    # 1234
-        result.token_usage       # {'total_tokens': 2998, ...}
-        result.success           # True
-        result.metadata          # Full metadata dictionary
-        ```
+        - `str`: The extracted information as a text string (may contain JSON or markdown depending on query and output_scheme)
         
         ### Raises:
-        - `ValidationError`: Invalid query format, missing URL, or invalid LLM key
-        - `APIError`: Web scraping failed or LLM processing error
+        - `ValidationError`: Missing query, missing URL, or invalid LLM key
         """
 
         # Validate LLM key
-        if llm_key is None:
-            import os
-            llm_key = os.getenv("BRIGHTDATA_API_TOKEN")
-            if not llm_key:
-                raise ValidationError(
-                    "Missing API key. Provide it via the `llm_key` parameter or set the "
-                    "`BRIGHTDATA_API_TOKEN` environment variable. Example:\n\n"
-                    "export BRIGHTDATA_API_TOKEN='your-openai-api-key'"
-                )
+        if not llm_key:
+            raise ValidationError(
+                "Missing API key. Provide it via the `llm_key` parameter or set the "
+                "`BRIGHTDATA_API_TOKEN` environment variable. Example:\n\n"
+                "export BRIGHTDATA_API_TOKEN='your-openai-api-key'"
+            )
             
         return self.extract_api.extract(query, url, output_scheme, llm_key)
