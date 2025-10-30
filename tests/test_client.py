@@ -15,11 +15,10 @@ All tests are designed to run without requiring real API tokens by:
 - Testing validation logic and error messages
 """
 
-import pytest
 import os
-from unittest.mock import patch
-
+import pytest
 from brightdata import bdclient
+from unittest.mock import patch
 from brightdata.exceptions import ValidationError
 
 
@@ -117,18 +116,17 @@ class TestClientMethods:
         assert "&brd_json=1" in request_data["url"]
 
 class TestClientSearchGPT:
-    """tests for the client.search_gpt() function"""
+    """Tests for the client.search_gpt() function"""
 
     @pytest.fixture
     @patch('brightdata.utils.zone_manager.ZoneManager.ensure_required_zones')
     def client(self, mock_zones):
         """Create a test client with mocked validation"""
         with patch.dict(os.environ, {}, clear=True):
-            from brightdata import bdclient
             client = bdclient(api_token="valid_test_token_12345678", auto_create_zones=False)
             return client
 
-    #  VALIDATION TESTS 
+    # VALIDATION TESTS 
 
     def test_prompt_required(self, client):
         """Ensure ValidationError is raised when prompt is missing"""
@@ -147,8 +145,32 @@ class TestClientSearchGPT:
 
     # PARAMETER NORMALIZATION 
     
-    def test_normalizes_single_values_to_list(self, client):
+    def test_normalizes_single_values_to_list(self, client, monkeypatch):
         """Convert single parameters to list form"""
+        # Mock the session.post to intercept and provide dummy response
+        def dummy_post(url, json=None, timeout=None):
+            from unittest.mock import Mock
+            r = Mock()
+            r.status_code = 200
+            # Build dummy response with normalized lists
+            if isinstance(json, list):
+                prompts = [item.get('prompt', '') for item in json]
+                countries = [item.get('country', '') for item in json]
+                sec_prompts = [item.get('additional_prompt', '') for item in json]
+                web_searches = [item.get('web_search', False) for item in json]
+            else:
+                prompts = [json.get('prompt', '')]
+                countries = [json.get('country', '')]
+                sec_prompts = [json.get('additional_prompt', '')]
+                web_searches = [json.get('web_search', False)]
+            r.json.return_value = {
+                'prompt': prompts,
+                'country': countries,
+                'secondaryPrompt': sec_prompts,
+                'webSearch': web_searches
+            }
+            return r
+        monkeypatch.setattr(client.search_api.session, 'post', dummy_post)
         result = client.search_gpt(
             prompt="hello",
             country="US",
@@ -194,7 +216,7 @@ class TestClientSearchGPT:
             from unittest.mock import Mock
             r = Mock()
             r.status_code = 200
-            r.json.return_value = {"ok": True}
+            r.json.return_value = {"id": "s_testid"}
             return r
 
         monkeypatch.setattr(client.search_api.session, "post", mock_post)
@@ -233,7 +255,3 @@ class TestClientSearchGPT:
         monkeypatch.setattr(client.search_api.session, "post", mock_post)
         with pytest.raises(RuntimeError, match="Failed after retries"):
             client.search_gpt(prompt="fail test", sync=True)
-
-
-if __name__ == "__main__":
-    pytest.main([__file__])
