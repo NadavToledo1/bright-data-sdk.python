@@ -294,7 +294,7 @@ class bdclient:
         # Query validation
         
         if not query:
-            raise ValidationError("The 'query' parameter cannot be None or empty.")
+            raise ValidationError("query cannot be empty")
         if isinstance(query, str):
             if not query.strip():
                 raise ValidationError("Search query cannot be empty or whitespace")
@@ -315,7 +315,9 @@ class bdclient:
         zone = zone or self.serp_zone
         max_workers = max_workers or self.DEFAULT_MAX_WORKERS
         
-        result = self.search_api.search(query, search_engine, zone or self.serp_zone, response_format, method, parse, timeout or self.DEFAULT_TIMEOUT)
+        result = self.search_api.search(query, search_engine, zone or self.serp_zone,
+                                response_format, method, parse, timeout or self.DEFAULT_TIMEOUT)
+
         return result
 
     def download_content(self, content: Union[Dict, str], filename: str = None, format: str = "json", parse: bool = False) -> str:
@@ -412,7 +414,7 @@ class bdclient:
                 countries[i] = ""
             else:
                 if not isinstance(c, str) or len(c.strip()) != 2 or not c.strip().isalpha():
-                    raise ValidationError("Country code must be a 2-letter code (ISO 3166-1 alpha-2)")
+                    raise ValidationError("must be 2-letter code")
                 countries[i] = c.strip().lower()
         # Validate follow-up prompts
         for i, f in enumerate(followups):
@@ -459,7 +461,7 @@ class bdclient:
         last_exception = None
         for attempt in range(self.MAX_RETRIES + 1):
             try:
-                response = self.session.post(endpoint, params=params, json=payload_data, timeout=timeout_value)
+                response = self.session.post(endpoint, json=payload_data, timeout=timeout_value)
             except requests.exceptions.RequestException as e:
                 last_exception = e
                 if attempt >= self.MAX_RETRIES:
