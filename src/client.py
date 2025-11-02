@@ -3,6 +3,7 @@ import re
 import time
 import json
 import requests
+from .search import Search
 from datetime import datetime
 from .api.crawl import CrawlAPI
 from .api.chatgpt import ChatGPTAPI
