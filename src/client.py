@@ -114,7 +114,7 @@ class bdclient:
         self.browser_username = browser_username or os.getenv('BRIGHTDATA_BROWSER_USERNAME')
         self.browser_password = browser_password or os.getenv('BRIGHTDATA_BROWSER_PASSWORD')
         
-        
+        self.search = Search(self)
         
         valid_browser_types = ["playwright", "puppeteer", "selenium"]
         if browser_type not in valid_browser_types:
