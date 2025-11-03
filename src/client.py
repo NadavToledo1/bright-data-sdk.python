@@ -55,149 +55,149 @@ class bdclient:
         log_level: str = "INFO",
         structured_logging: bool = True,
         verbose: bool = None
-    ):
-    """
-    Initialize the Bright Data client with your API token.
+        ):
+        """
+        Initialize the Bright Data client with your API token.
+    
+        Create an account at https://brightdata.com/ to get your API token.
+        Go to Settings > API Keys and verify that your key has "Admin" permissions.
+    
+        Args:
+            api_token: Your Bright Data API token (or set BRIGHTDATA_API_TOKEN env var)
+            auto_create_zones: Auto-create required zones if missing (default: True)
+            web_unlocker_zone: Custom Web Unlocker zone name (default: 'sdk_unlocker')
+            serp_zone: Custom SERP zone name (default: 'sdk_serp')
+            browser_zone: Custom Browser zone name (default: 'sdk_browser')
+            browser_username: Browser API username ("username-zone-{zone_name}")
+            browser_password: Browser API password
+            browser_type: "playwright", "puppeteer", or "selenium" (default: "playwright")
+            log_level: Logging level
+            structured_logging: Enable structured JSON logging
+            verbose: When True, show all logs per log_level. Can also use BRIGHTDATA_VERBOSE env var.
+        """
 
-    Create an account at https://brightdata.com/ to get your API token.
-    Go to Settings > API Keys and verify that your key has "Admin" permissions.
-
-    Args:
-        api_token: Your Bright Data API token (or set BRIGHTDATA_API_TOKEN env var)
-        auto_create_zones: Auto-create required zones if missing (default: True)
-        web_unlocker_zone: Custom Web Unlocker zone name (default: 'sdk_unlocker')
-        serp_zone: Custom SERP zone name (default: 'sdk_serp')
-        browser_zone: Custom Browser zone name (default: 'sdk_browser')
-        browser_username: Browser API username ("username-zone-{zone_name}")
-        browser_password: Browser API password
-        browser_type: "playwright", "puppeteer", or "selenium" (default: "playwright")
-        log_level: Logging level
-        structured_logging: Enable structured JSON logging
-        verbose: When True, show all logs per log_level. Can also use BRIGHTDATA_VERBOSE env var.
-    """
-
-    try:
-        from dotenv import load_dotenv
-        load_dotenv()
-    except ImportError:
-        pass
-
-    if verbose is None:
-        env_verbose = os.getenv('BRIGHTDATA_VERBOSE', '').lower()
-        verbose = env_verbose in ('true', '1', 'yes', 'on')
-
-    setup_logging(log_level, structured_logging, verbose)
-    logger.info("Initializing Bright Data SDK client")
-
-    # API Token Validation
-    self.api_token = api_token or os.getenv('BRIGHTDATA_API_TOKEN')
-    if not self.api_token:
-        logger.error("API token not provided")
-        raise ValidationError(
-            "API token is required. Pass api_token or set BRIGHTDATA_API_TOKEN env var."
+        try:
+            from dotenv import load_dotenv
+            load_dotenv()
+        except ImportError:
+            pass
+    
+        if verbose is None:
+            env_verbose = os.getenv('BRIGHTDATA_VERBOSE', '').lower()
+            verbose = env_verbose in ('true', '1', 'yes', 'on')
+    
+        setup_logging(log_level, structured_logging, verbose)
+        logger.info("Initializing Bright Data SDK client")
+    
+        # API Token Validation
+        self.api_token = api_token or os.getenv('BRIGHTDATA_API_TOKEN')
+        if not self.api_token:
+            logger.error("API token not provided")
+            raise ValidationError(
+                "API token is required. Pass api_token or set BRIGHTDATA_API_TOKEN env var."
+            )
+    
+        if not isinstance(self.api_token, str):
+            logger.error("API token must be a string")
+            raise ValidationError("API token must be a string")
+    
+        if len(self.api_token.strip()) < 10:
+            logger.error("API token appears to be invalid (too short)")
+            raise ValidationError("API token appears to be invalid")
+    
+        token_preview = f"{self.api_token[:4]}***{self.api_token[-4:]}"
+        logger.info(f"API token validated successfully: {token_preview}")
+    
+        self.web_unlocker_zone = web_unlocker_zone or os.getenv('WEB_UNLOCKER_ZONE', 'sdk_unlocker')
+        self.serp_zone = serp_zone or os.getenv('SERP_ZONE', 'sdk_serp')
+        self.browser_zone = browser_zone or os.getenv('BROWSER_ZONE', 'sdk_browser')
+        self.auto_create_zones = auto_create_zones
+    
+        self.browser_username = browser_username or os.getenv('BRIGHTDATA_BROWSER_USERNAME')
+        self.browser_password = browser_password or os.getenv('BRIGHTDATA_BROWSER_PASSWORD')
+    
+        valid_browser_types = ["playwright", "puppeteer", "selenium"]
+        if browser_type not in valid_browser_types:
+            raise ValidationError(
+                f"Invalid browser_type '{browser_type}'. Must be one of: {valid_browser_types}"
+            )
+        self.browser_type = browser_type
+    
+        if self.browser_username and self.browser_password:
+            browser_preview = f"{self.browser_username[:3]}***"
+            logger.info(f"Browser credentials configured: {browser_preview} (type: {self.browser_type})")
+        elif self.browser_username or self.browser_password:
+            logger.warning("Incomplete browser credentials: both username and password are required.")
+        else:
+            logger.debug("No browser credentials provided - browser API will not be available.")
+    
+        self.session = requests.Session()
+        self.session.headers.update({
+            'Authorization': f'Bearer {self.api_token}',
+            'Content-Type': 'application/json',
+            'User-Agent': f'brightdata-sdk/{__version__}'
+        })
+        logger.info("HTTP session configured with secure headers")
+    
+        adapter = requests.adapters.HTTPAdapter(
+            pool_connections=self.CONNECTION_POOL_SIZE,
+            pool_maxsize=self.CONNECTION_POOL_SIZE,
+            max_retries=0
         )
-
-    if not isinstance(self.api_token, str):
-        logger.error("API token must be a string")
-        raise ValidationError("API token must be a string")
-
-    if len(self.api_token.strip()) < 10:
-        logger.error("API token appears to be invalid (too short)")
-        raise ValidationError("API token appears to be invalid")
-
-    token_preview = f"{self.api_token[:4]}***{self.api_token[-4:]}"
-    logger.info(f"API token validated successfully: {token_preview}")
-
-    self.web_unlocker_zone = web_unlocker_zone or os.getenv('WEB_UNLOCKER_ZONE', 'sdk_unlocker')
-    self.serp_zone = serp_zone or os.getenv('SERP_ZONE', 'sdk_serp')
-    self.browser_zone = browser_zone or os.getenv('BROWSER_ZONE', 'sdk_browser')
-    self.auto_create_zones = auto_create_zones
-
-    self.browser_username = browser_username or os.getenv('BRIGHTDATA_BROWSER_USERNAME')
-    self.browser_password = browser_password or os.getenv('BRIGHTDATA_BROWSER_PASSWORD')
-
-    valid_browser_types = ["playwright", "puppeteer", "selenium"]
-    if browser_type not in valid_browser_types:
-        raise ValidationError(
-            f"Invalid browser_type '{browser_type}'. Must be one of: {valid_browser_types}"
+        self.session.mount('https://', adapter)
+        self.session.mount('http://', adapter)
+    
+        self.zone_manager = ZoneManager(self.session)
+    
+        self.web_scraper = WebScraper(
+            self.session,
+            self.DEFAULT_TIMEOUT,
+            self.MAX_RETRIES,
+            self.RETRY_BACKOFF_FACTOR
         )
-    self.browser_type = browser_type
-
-    if self.browser_username and self.browser_password:
-        browser_preview = f"{self.browser_username[:3]}***"
-        logger.info(f"Browser credentials configured: {browser_preview} (type: {self.browser_type})")
-    elif self.browser_username or self.browser_password:
-        logger.warning("Incomplete browser credentials: both username and password are required.")
-    else:
-        logger.debug("No browser credentials provided - browser API will not be available.")
-
-    self.session = requests.Session()
-    self.session.headers.update({
-        'Authorization': f'Bearer {self.api_token}',
-        'Content-Type': 'application/json',
-        'User-Agent': f'brightdata-sdk/{__version__}'
-    })
-    logger.info("HTTP session configured with secure headers")
-
-    adapter = requests.adapters.HTTPAdapter(
-        pool_connections=self.CONNECTION_POOL_SIZE,
-        pool_maxsize=self.CONNECTION_POOL_SIZE,
-        max_retries=0
-    )
-    self.session.mount('https://', adapter)
-    self.session.mount('http://', adapter)
-
-    self.zone_manager = ZoneManager(self.session)
-
-    self.web_scraper = WebScraper(
-        self.session,
-        self.DEFAULT_TIMEOUT,
-        self.MAX_RETRIES,
-        self.RETRY_BACKOFF_FACTOR
-    )
-
-    self.search_api = SearchAPI(
-        self.session,
-        self.DEFAULT_TIMEOUT,
-        self.MAX_RETRIES,
-        self.RETRY_BACKOFF_FACTOR
-    )
-
-    self.chatgpt_api = ChatGPTAPI(
-        self.session,
-        self.api_token,
-        self.DEFAULT_TIMEOUT,
-        self.MAX_RETRIES,
-        self.RETRY_BACKOFF_FACTOR
-    )
-
-    self.linkedin_api = LinkedInAPI(
-        self.session,
-        self.api_token,
-        self.DEFAULT_TIMEOUT,
-        self.MAX_RETRIES,
-        self.RETRY_BACKOFF_FACTOR
-    )
-
-    self.download_api = DownloadAPI(self.session, self.api_token, self.DEFAULT_TIMEOUT)
-
-    self.crawl_api = CrawlAPI(
-        self.session,
-        self.api_token,
-        self.DEFAULT_TIMEOUT,
-        self.MAX_RETRIES,
-        self.RETRY_BACKOFF_FACTOR
-    )
-
-    self.extract_api = ExtractAPI(self)
-
-    self.search = Search(self)
-
-    if self.auto_create_zones:
-        self.zone_manager.ensure_required_zones(
-            self.web_unlocker_zone,
-            self.serp_zone
+    
+        self.search_api = SearchAPI(
+            self.session,
+            self.DEFAULT_TIMEOUT,
+            self.MAX_RETRIES,
+            self.RETRY_BACKOFF_FACTOR
         )
+    
+        self.chatgpt_api = ChatGPTAPI(
+            self.session,
+            self.api_token,
+            self.DEFAULT_TIMEOUT,
+            self.MAX_RETRIES,
+            self.RETRY_BACKOFF_FACTOR
+        )
+    
+        self.linkedin_api = LinkedInAPI(
+            self.session,
+            self.api_token,
+            self.DEFAULT_TIMEOUT,
+            self.MAX_RETRIES,
+            self.RETRY_BACKOFF_FACTOR
+        )
+    
+        self.download_api = DownloadAPI(self.session, self.api_token, self.DEFAULT_TIMEOUT)
+    
+        self.crawl_api = CrawlAPI(
+            self.session,
+            self.api_token,
+            self.DEFAULT_TIMEOUT,
+            self.MAX_RETRIES,
+            self.RETRY_BACKOFF_FACTOR
+        )
+    
+        self.extract_api = ExtractAPI(self)
+    
+        self.search = Search(self)
+    
+        if self.auto_create_zones:
+            self.zone_manager.ensure_required_zones(
+                self.web_unlocker_zone,
+                self.serp_zone
+            )
 
     
     def scrape(
