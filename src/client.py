@@ -191,7 +191,6 @@ class bdclient:
 
     self.extract_api = ExtractAPI(self)
 
-    from .search import Search
     self.search = Search(self)
 
     if self.auto_create_zones:
