@@ -1,6 +1,7 @@
+from __future__ import annotations
+
 import re
 import time
-from __future__ import annotations
 from .exceptions import ValidationError, APIError
 from typing import Any, Dict, List, Optional, Union
 
